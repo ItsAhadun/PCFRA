@@ -25,6 +25,8 @@ import {
 import { useCreateSite } from '@/hooks/use-sites'
 import type { CreateSiteInput } from '@/types'
 import { HIGH_RISE_THRESHOLD_M } from '@/types'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { AlertCircle } from 'lucide-react'
 
 const BUILDING_USES = [
   'Residential',
@@ -64,13 +66,19 @@ export default function NewSitePage() {
     dutyholder_phone: '',
     principal_contractor: '',
   })
+  const [error, setError] = useState<string | null>(null)
 
   const isHighRise = (form.building_height_m || 0) > HIGH_RISE_THRESHOLD_M
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const site = await createSite.mutateAsync(form)
-    router.push(`/sites/${site.id}`)
+    setError(null)
+    try {
+      const site = await createSite.mutateAsync(form)
+      router.push(`/sites/${site.id}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create site')
+    }
   }
 
   const updateForm = (updates: Partial<CreateSiteInput>) => {
@@ -95,6 +103,13 @@ export default function NewSitePage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
         {/* Basic Information */}
         <Card>
           <CardHeader>

@@ -251,6 +251,7 @@ export interface CreateAssessmentInput {
   site_id: string
   assessor_name?: string
   assessment_date?: string
+  is_high_rise?: boolean
 }
 
 export interface CreateHazardInput {

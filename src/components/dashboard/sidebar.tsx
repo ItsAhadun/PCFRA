@@ -105,7 +105,11 @@ export function DashboardSidebar() {
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-72 p-0">
+          <SheetContent
+            side="left"
+            className="w-72 p-0"
+            id="sidebar-sheet-content"
+          >
             <div className="flex h-full flex-col">
               {/* Header */}
               <div className="flex items-center gap-2 border-b p-4">

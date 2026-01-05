@@ -65,6 +65,7 @@ function NewAssessmentForm() {
         site_id: siteId,
         assessor_name: assessorName,
         assessment_date: assessmentDate,
+        is_high_rise: isHighRise,
       })
 
       router.push(`/assessments/${assessment.id}/edit`)

@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS sites (
 );
 
 -- Assessments table: Fire risk assessment records
+-- FIXED: Removed the invalid GENERATED column that caused the error
 CREATE TABLE IF NOT EXISTS assessments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
@@ -33,9 +34,7 @@ CREATE TABLE IF NOT EXISTS assessments (
   current_section INTEGER DEFAULT 1,
   overall_risk_level VARCHAR(20),
   overall_risk_score INTEGER,
-  is_high_rise BOOLEAN GENERATED ALWAYS AS (
-    CASE WHEN (SELECT building_height_m FROM sites WHERE sites.id = site_id) > 18 THEN TRUE ELSE FALSE END
-  ) STORED,
+  is_high_rise BOOLEAN DEFAULT FALSE, -- Changed from GENERATED to standard BOOLEAN
   assessor_name VARCHAR(255),
   assessment_date DATE DEFAULT CURRENT_DATE,
   next_review_date DATE,
