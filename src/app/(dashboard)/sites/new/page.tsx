@@ -75,7 +75,7 @@ export default function NewSitePage() {
     setError(null)
     try {
       const site = await createSite.mutateAsync(form)
-      router.push(`/sites/${site.id}`)
+      router.push('/sites')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create site')
     }
@@ -144,7 +144,7 @@ export default function NewSitePage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="postcode">Postcode</Label>
                 <Input
@@ -180,7 +180,7 @@ export default function NewSitePage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="height">Building Height (m)</Label>
                 <Input
@@ -223,7 +223,7 @@ export default function NewSitePage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="building_use">Building Use</Label>
                 <Select
@@ -287,7 +287,7 @@ export default function NewSitePage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="dutyholder_email">Email</Label>
                 <Input

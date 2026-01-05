@@ -74,7 +74,7 @@ export function SiteInformationSection({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
             <div>
               <span className="text-muted-foreground">Address:</span>
               <p className="font-medium">{site.address}</p>
@@ -145,7 +145,7 @@ export function SiteInformationSection({
       <div className="space-y-4">
         <h3 className="font-medium">Additional Site Information</h3>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="site_contact">Site Contact Name</Label>
             <Input
@@ -182,7 +182,7 @@ export function SiteInformationSection({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="occupancy_type">Occupancy Type</Label>
             <Input
