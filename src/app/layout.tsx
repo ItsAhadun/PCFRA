@@ -13,8 +13,9 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: 'Next.js and Supabase Starter Kit',
-  description: 'The fastest way to build apps with Next.js and Supabase',
+  title: 'PCFRA | Fire Risk Assessment',
+  description:
+    'Principal Contractor Fire Risk Assessment - Building Safety Act 2022 Compliant',
 }
 
 const geistSans = Geist({
