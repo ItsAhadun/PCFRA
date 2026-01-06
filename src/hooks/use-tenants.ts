@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/supabase/client'
 import type { Tenant, CreateTenantInput, UpdateTenantInput } from '@/types'
+import { sanitizeFormData } from '@/utils/sanitize'
 
 const TENANTS_KEY = ['tenants']
 const SITES_KEY = ['sites']
@@ -129,6 +130,9 @@ export function useCreateTenant() {
 
   return useMutation({
     mutationFn: async (input: CreateTenantInput) => {
+      // Sanitize input data
+      const sanitizedInput = sanitizeFormData(input)
+
       const {
         data: { user },
       } = await supabase.auth.getUser()
@@ -137,7 +141,7 @@ export function useCreateTenant() {
 
       const { data, error } = await supabase
         .from('tenants')
-        .insert({ ...input, user_id: user.id })
+        .insert({ ...sanitizedInput, user_id: user.id })
         .select('*, site:sites(*)')
         .single()
 
@@ -164,9 +168,12 @@ export function useUpdateTenant() {
 
   return useMutation({
     mutationFn: async ({ id, ...input }: UpdateTenantInput) => {
+      // Sanitize input data
+      const sanitizedInput = sanitizeFormData(input)
+
       const { data, error } = await supabase
         .from('tenants')
-        .update(input)
+        .update(sanitizedInput)
         .eq('id', id)
         .select('*, site:sites(*)')
         .single()
