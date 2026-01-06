@@ -89,9 +89,8 @@ export default async function Home() {
           </h1>
 
           <p className="text-muted-foreground mx-auto mb-10 max-w-2xl text-xl">
-            A comprehensive compliance ecosystem for safety officers to perform
-            high-stakes fire risk assessments on construction sites with full
-            Golden Thread documentation.
+            A comprehensive emergency information system for building
+            management, first responders, and residents.
           </p>
 
           <div className="flex flex-col justify-center gap-4 sm:flex-row">
@@ -106,15 +105,80 @@ export default async function Home() {
               <>
                 <Button size="lg" asChild>
                   <Link href="/auth/sign-up">
-                    Start Free Assessment
+                    Staff Sign Up
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Link>
                 </Button>
                 <Button size="lg" variant="outline" asChild>
-                  <Link href="/auth/login">Sign In to Dashboard</Link>
+                  <Link href="/auth/login">Staff Sign In</Link>
                 </Button>
               </>
             )}
+          </div>
+        </div>
+      </section>
+
+      {/* User Types Section */}
+      <section className="bg-muted/50 py-16">
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="mb-12 text-center">
+            <h2 className="mb-4 text-3xl font-bold">
+              Three User Types, One System
+            </h2>
+            <p className="text-muted-foreground mx-auto max-w-xl">
+              Our platform serves fire services, building staff, and residents
+              with tailored experiences for each.
+            </p>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-3">
+            {/* Fire Services */}
+            <div className="bg-background rounded-xl border-2 border-red-200 p-6 shadow-sm dark:border-red-800">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+                <Flame className="h-7 w-7 text-red-500" />
+              </div>
+              <h3 className="mb-2 text-xl font-semibold">Fire Services</h3>
+              <p className="text-muted-foreground mb-4 text-sm">
+                Scan QR codes on apartment doors to instantly access resident
+                emergency information during incidents.
+              </p>
+              <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300">
+                <strong>No login required</strong> — Just scan the QR code
+              </div>
+            </div>
+
+            {/* Internal Staff */}
+            <div className="bg-background rounded-xl border-2 border-orange-200 p-6 shadow-sm dark:border-orange-800">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30">
+                <Building2 className="h-7 w-7 text-orange-500" />
+              </div>
+              <h3 className="mb-2 text-xl font-semibold">Internal Staff</h3>
+              <p className="text-muted-foreground mb-4 text-sm">
+                Manage buildings, generate registration links for residents, and
+                print emergency QR codes for apartment doors.
+              </p>
+              <Button asChild className="w-full">
+                <Link href="/auth/login">
+                  Staff Dashboard
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+
+            {/* Residents */}
+            <div className="bg-background rounded-xl border-2 border-green-200 p-6 shadow-sm dark:border-green-800">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+                <CheckCircle className="h-7 w-7 text-green-500" />
+              </div>
+              <h3 className="mb-2 text-xl font-semibold">Residents</h3>
+              <p className="text-muted-foreground mb-4 text-sm">
+                Received a registration link from building management? Fill out
+                your emergency information to help first responders.
+              </p>
+              <div className="rounded-lg bg-green-50 p-3 text-sm text-green-700 dark:bg-green-900/20 dark:text-green-300">
+                <strong>No login required</strong> — Use your unique link
+              </div>
+            </div>
           </div>
         </div>
       </section>

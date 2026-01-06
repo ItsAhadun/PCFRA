@@ -26,7 +26,7 @@ export default async function DashboardLayout({
       <DashboardSidebar />
       {/* Main content */}
       <main className="pt-16 lg:pt-0 lg:pl-64">
-        <div className="p-6">{children}</div>
+        <div className="p-4 md:p-6">{children}</div>
       </main>
     </div>
   )

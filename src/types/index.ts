@@ -109,6 +109,55 @@ export interface AuditLog {
   created_at: string
 }
 
+export interface Tenant {
+  id: string
+  site_id: string
+  user_id: string
+  apartment_number: string
+  floor_number: number
+  tenant_name: string
+  // Disability and mobility information
+  has_mobility_issues: boolean
+  uses_wheelchair: boolean
+  has_visual_impairment: boolean
+  has_hearing_impairment: boolean
+  has_cognitive_impairment: boolean
+  requires_assistance_evacuation: boolean
+  other_disabilities?: string
+  // Medical information
+  blood_type?: string
+  allergies?: string
+  medical_conditions?: string
+  oxygen_dependent: boolean
+  // Emergency contact
+  emergency_contact_name?: string
+  emergency_contact_phone?: string
+  // Additional info
+  notes?: string
+  number_of_occupants: number
+  // Auto-calculated
+  risk_level: RiskLevel
+  qr_code_url?: string
+  created_at: string
+  updated_at: string
+  // Joined data
+  site?: Site
+}
+
+export interface RegistrationToken {
+  id: string
+  site_id: string
+  token: string
+  expires_at: string
+  used_at?: string
+  tenant_id?: string
+  created_at: string
+  created_by?: string
+  // Joined data
+  site?: Site
+  tenant?: Tenant
+}
+
 // ============================================
 // Enum Types
 // ============================================
@@ -127,7 +176,7 @@ export type Priority = 'critical' | 'high' | 'medium' | 'low'
 
 export type ActionStatus = 'pending' | 'in_progress' | 'completed' | 'overdue'
 
-export type EntityType = 'site' | 'assessment' | 'hazard' | 'action'
+export type EntityType = 'site' | 'assessment' | 'hazard' | 'action' | 'tenant'
 
 export type AuditAction = 'create' | 'update' | 'delete' | 'sign' | 'export'
 
@@ -288,6 +337,103 @@ export interface UpdateActionInput extends Partial<
   id: string
   status?: ActionStatus
   completion_notes?: string
+}
+
+export interface CreateTenantInput {
+  site_id: string
+  apartment_number: string
+  floor_number: number
+  tenant_name: string
+  has_mobility_issues?: boolean
+  uses_wheelchair?: boolean
+  has_visual_impairment?: boolean
+  has_hearing_impairment?: boolean
+  has_cognitive_impairment?: boolean
+  requires_assistance_evacuation?: boolean
+  other_disabilities?: string
+  blood_type?: string
+  allergies?: string
+  medical_conditions?: string
+  oxygen_dependent?: boolean
+  emergency_contact_name?: string
+  emergency_contact_phone?: string
+  notes?: string
+  number_of_occupants?: number
+}
+
+export interface UpdateTenantInput extends Partial<
+  Omit<CreateTenantInput, 'site_id'>
+> {
+  id: string
+}
+
+export interface CreateRegistrationTokenInput {
+  site_id: string
+  expires_in_days?: number // Default: 30
+}
+
+export interface ResidentRegistrationInput {
+  token: string
+  apartment_number: string
+  floor_number: number
+  tenant_name: string
+  number_of_occupants: number
+  // Disability information
+  has_mobility_issues?: boolean
+  uses_wheelchair?: boolean
+  has_visual_impairment?: boolean
+  has_hearing_impairment?: boolean
+  has_cognitive_impairment?: boolean
+  requires_assistance_evacuation?: boolean
+  other_disabilities?: string
+  // Medical information
+  blood_type?: string
+  allergies?: string
+  medical_conditions?: string
+  oxygen_dependent?: boolean
+  // Emergency contact
+  emergency_contact_name?: string
+  emergency_contact_phone?: string
+
+  notes?: string
+  // Section 1: Site Information
+  site_name?: string
+  assessment_date?: string
+  site_address?: string
+  postcode?: string
+  assessor_name?: string
+  assessor_company?: string
+  principal_contractor?: string
+  dutyholder_name?: string
+  dutyholder_contact?: string
+  project_description?: string
+  // Section 2: Building Details
+  building_type?: string
+  number_of_floors_site?: number
+  building_height?: number
+  occupancy_type?: string
+  estimated_occupancy?: number
+  vulnerable_occupants?: string
+  // Section 3: Fire Safety Provisions
+  fire_alarm_type?: string
+  fire_alarm_working?: string
+  emergency_lighting?: string
+  fire_extinguishers?: string
+  sprinkler_system?: string
+  smoke_ventilation?: string
+  // Section 4: Fire Doors & Compartmentation
+  fire_doors_present?: string
+  fire_doors_condition?: string
+  self_closing_mechanism?: string
+  // Section 5: Means of Escape
+  escape_routes_adequate?: string
+  escape_routes_clear?: string
+  emergency_exits?: string
+  assembly_point?: string
+  evacuation_procedure?: string
+  // Section 6: Hot Works & Construction Activities
+  hot_works_permit_system?: string
+  hot_works_training?: string
 }
 
 // ============================================

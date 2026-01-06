@@ -4,6 +4,7 @@ import { ThemeProvider } from 'next-themes'
 import NextTopLoader from 'nextjs-toploader'
 import { Analytics } from '@vercel/analytics/react'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+import { Toaster } from 'sonner'
 import './globals.css'
 import ReactQueryProvider from '@/providers/ReactQueryProvider'
 
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
             {children}
             <Analytics />
             <ReactQueryDevtools initialIsOpen={false} />
+            <Toaster />
           </ReactQueryProvider>
         </ThemeProvider>
       </body>

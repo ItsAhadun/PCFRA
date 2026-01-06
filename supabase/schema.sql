@@ -250,3 +250,80 @@ CREATE POLICY "Users can delete their hazard photos" ON storage.objects
     bucket_id = 'hazard-photos' AND 
     auth.uid() IS NOT NULL
   );
+
+-- ============================================
+-- Tenants Table: Apartment occupant information for QR codes
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS tenants (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  site_id UUID NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  apartment_number VARCHAR(20) NOT NULL,
+  floor_number INTEGER NOT NULL,
+  tenant_name VARCHAR(255) NOT NULL,
+  -- Disability and mobility information
+  has_mobility_issues BOOLEAN DEFAULT FALSE,
+  uses_wheelchair BOOLEAN DEFAULT FALSE,
+  has_visual_impairment BOOLEAN DEFAULT FALSE,
+  has_hearing_impairment BOOLEAN DEFAULT FALSE,
+  has_cognitive_impairment BOOLEAN DEFAULT FALSE,
+  requires_assistance_evacuation BOOLEAN DEFAULT FALSE,
+  other_disabilities TEXT,
+  -- Medical information
+  blood_type VARCHAR(10),
+  allergies TEXT,
+  medical_conditions TEXT,
+  oxygen_dependent BOOLEAN DEFAULT FALSE,
+  -- Emergency contact
+  emergency_contact_name VARCHAR(255),
+  emergency_contact_phone VARCHAR(20),
+  -- Additional info
+  notes TEXT,
+  number_of_occupants INTEGER DEFAULT 1,
+  -- Auto-calculated risk level based on conditions
+  risk_level VARCHAR(20) GENERATED ALWAYS AS (
+    CASE 
+      WHEN (uses_wheelchair OR oxygen_dependent) AND floor_number >= 3 THEN 'critical'
+      WHEN (has_mobility_issues OR requires_assistance_evacuation) AND floor_number >= 2 THEN 'high'
+      WHEN uses_wheelchair OR oxygen_dependent THEN 'high'
+      WHEN has_mobility_issues OR requires_assistance_evacuation THEN 'medium'
+      WHEN has_visual_impairment OR has_hearing_impairment OR has_cognitive_impairment THEN 'medium'
+      ELSE 'low'
+    END
+  ) STORED,
+  qr_code_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(site_id, apartment_number)
+);
+
+-- Indexes for tenants
+CREATE INDEX IF NOT EXISTS idx_tenants_site_id ON tenants(site_id);
+CREATE INDEX IF NOT EXISTS idx_tenants_user_id ON tenants(user_id);
+CREATE INDEX IF NOT EXISTS idx_tenants_risk_level ON tenants(risk_level);
+CREATE INDEX IF NOT EXISTS idx_tenants_floor ON tenants(floor_number);
+
+-- RLS for tenants
+ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own tenants" ON tenants
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create their own tenants" ON tenants
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own tenants" ON tenants
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own tenants" ON tenants
+  FOR DELETE USING (auth.uid() = user_id);
+
+-- Public access for QR code scanning (first responders)
+CREATE POLICY "Anyone can view tenant by id for QR scan" ON tenants
+  FOR SELECT USING (true);
+
+-- Updated_at trigger for tenants
+CREATE TRIGGER update_tenants_updated_at
+  BEFORE UPDATE ON tenants
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

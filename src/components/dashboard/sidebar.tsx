@@ -11,6 +11,9 @@ import {
   Menu,
   X,
   Flame,
+  Users,
+  Printer,
+  ScanLine,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -27,6 +30,9 @@ const NAV_ITEMS = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/sites', icon: Building2, label: 'Sites' },
   { href: '/assessments', icon: ClipboardCheck, label: 'Assessments' },
+  { href: '/tenants', icon: Users, label: 'Tenants' },
+  { href: '/tools/print-qr', icon: Printer, label: 'Print QR Codes' },
+  { href: '/scan-qr', icon: ScanLine, label: 'Scan QR' },
 ]
 
 function UserAvatar() {
@@ -101,7 +107,7 @@ export function DashboardSidebar() {
         </div>
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" suppressHydrationWarning>
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
@@ -114,7 +120,10 @@ export function DashboardSidebar() {
               {/* Header */}
               <div className="flex items-center gap-2 border-b p-4">
                 <Flame className="h-6 w-6 text-orange-500" />
-                <span className="font-bold">PCFRA</span>
+                <div>
+                  <span className="font-bold">PCFRA</span>
+                  <p className="text-muted-foreground text-xs">Staff Portal</p>
+                </div>
               </div>
 
               {/* Navigation */}
@@ -145,9 +154,7 @@ export function DashboardSidebar() {
             <Flame className="h-8 w-8 text-orange-500" />
             <div>
               <h1 className="text-lg font-bold">PCFRA</h1>
-              <p className="text-muted-foreground text-xs">
-                Fire Risk Assessment
-              </p>
+              <p className="text-muted-foreground text-xs">Staff Portal</p>
             </div>
           </div>
 
