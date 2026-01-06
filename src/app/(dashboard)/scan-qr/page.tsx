@@ -273,7 +273,9 @@ export default function ScanQRPage() {
     setSelectedCamera(newCameraId)
 
     try {
-      if (isScanning) {
+      // Check if scanner is in a running state before stopping
+      const state = scannerRef.current.getState()
+      if (state === 2 || state === 3) {
         await scannerRef.current.stop()
         setIsScanning(false)
       }
