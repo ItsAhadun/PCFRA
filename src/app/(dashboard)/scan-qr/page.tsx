@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   Card,
   CardContent,
@@ -9,10 +9,28 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Html5QrcodeScanner } from 'html5-qrcode'
+import { Html5Qrcode } from 'html5-qrcode'
 import { toast } from 'sonner'
-import { AlertCircle, CheckCircle2, Camera } from 'lucide-react'
+import {
+  AlertCircle,
+  CheckCircle2,
+  Camera,
+  SwitchCamera,
+  RefreshCw,
+} from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+
+interface CameraDevice {
+  id: string
+  label: string
+}
 
 export default function ScanQRPage() {
   const [scanResult, setScanResult] = useState<string | null>(null)
@@ -20,7 +38,107 @@ export default function ScanQRPage() {
   const [permissionStatus, setPermissionStatus] = useState<
     'granted' | 'denied' | 'prompt'
   >('prompt')
-  const [scannerInitialized, setScannerInitialized] = useState(false)
+  const [isScanning, setIsScanning] = useState(false)
+  const [cameras, setCameras] = useState<CameraDevice[]>([])
+  const [selectedCamera, setSelectedCamera] = useState<string | null>(null)
+
+  const scannerRef = useRef<Html5Qrcode | null>(null)
+  const lastScannedRef = useRef<string | null>(null)
+  const lastScanTimeRef = useRef<number>(0)
+
+  // Minimum time between accepting same QR code again (5 seconds)
+  const DEBOUNCE_TIME = 5000
+
+  const stopScanner = useCallback(async () => {
+    if (scannerRef.current && isScanning) {
+      try {
+        await scannerRef.current.stop()
+        setIsScanning(false)
+      } catch (err) {
+        console.error('Error stopping scanner:', err)
+      }
+    }
+  }, [isScanning])
+
+  const startScanner = useCallback(
+    async (cameraId?: string) => {
+      if (!scannerRef.current) return
+
+      try {
+        setError(null)
+
+        const cameraIdToUse = cameraId || selectedCamera
+
+        const config = {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+        }
+
+        const onScanSuccess = (decodedText: string) => {
+          const now = Date.now()
+
+          // Check if this is a duplicate scan
+          if (
+            lastScannedRef.current === decodedText &&
+            now - lastScanTimeRef.current < DEBOUNCE_TIME
+          ) {
+            // Same QR code scanned within debounce time, ignore
+            return
+          }
+
+          // New scan or enough time has passed
+          lastScannedRef.current = decodedText
+          lastScanTimeRef.current = now
+          setScanResult(decodedText)
+
+          toast.success('QR Code Scanned!', {
+            description:
+              decodedText.length > 50
+                ? `${decodedText.substring(0, 50)}...`
+                : decodedText,
+            id: 'qr-scan-success', // Use same ID to prevent duplicate toasts
+          })
+        }
+
+        if (cameraIdToUse) {
+          await scannerRef.current.start(
+            cameraIdToUse,
+            config,
+            onScanSuccess,
+            () => {}, // Ignore scan failures
+          )
+        } else {
+          // Use back camera by default on mobile
+          await scannerRef.current.start(
+            { facingMode: 'environment' },
+            config,
+            onScanSuccess,
+            () => {},
+          )
+        }
+
+        setIsScanning(true)
+      } catch (err) {
+        console.error('Error starting scanner:', err)
+        setError(
+          'Failed to start camera. Please check permissions and try again.',
+        )
+      }
+    },
+    [selectedCamera],
+  )
+
+  const switchCamera = useCallback(
+    async (newCameraId: string) => {
+      setSelectedCamera(newCameraId)
+      if (isScanning) {
+        await stopScanner()
+        // Small delay before starting with new camera
+        setTimeout(() => startScanner(newCameraId), 100)
+      }
+    },
+    [isScanning, stopScanner, startScanner],
+  )
 
   const requestCameraPermission = useCallback(async () => {
     try {
@@ -31,9 +149,6 @@ export default function ScanQRPage() {
       // Stop the stream immediately - we just needed to trigger the permission
       stream.getTracks().forEach((track) => track.stop())
       setPermissionStatus('granted')
-      // Re-trigger scanner initialization
-      setScannerInitialized(false)
-      setTimeout(() => setScannerInitialized(true), 100)
     } catch (err: unknown) {
       console.error('Camera permission error:', err)
       if (err instanceof Error && err.name === 'NotAllowedError') {
@@ -51,7 +166,6 @@ export default function ScanQRPage() {
 
   // Check initial permission status
   useEffect(() => {
-    // Skip on server or if permissions API not available (we default to 'prompt')
     if (typeof window === 'undefined' || !navigator.permissions) {
       return
     }
@@ -70,76 +184,61 @@ export default function ScanQRPage() {
       })
   }, [])
 
+  // Initialize scanner and get cameras when permission is granted
   useEffect(() => {
-    // Only run on client side
     if (typeof window === 'undefined') return
+    if (permissionStatus !== 'granted') return
 
-    // Don't initialize if permission is denied
-    if (permissionStatus === 'denied') return
+    // Initialize the scanner
+    scannerRef.current = new Html5Qrcode('reader')
 
-    function onScanSuccess(decodedText: string) {
-      // Handle the scanned code as you retrieve it
-      console.log(`Code matched = ${decodedText}`)
-      setScanResult(decodedText)
-
-      toast.success('QR Code Scanned!', {
-        description: `Content: ${decodedText}`,
-      })
-    }
-
-    function onScanFailure() {
-      // handle scan failure, usually better to ignore and keep scanning.
-    }
-
-    // Use a reference to track if the effect is active
-    let isMounted = true
-    let scanner: Html5QrcodeScanner | null = null
-
-    // Give a small delay to ensure DOM is ready and previous instances are cleared
-    const initTimer = setTimeout(() => {
-      if (!isMounted) return
-
-      // Clean up any existing scanner content manually if needed
-      const readerElement = document.getElementById('reader')
-      if (readerElement) {
-        readerElement.innerHTML = ''
-      }
-
-      scanner = new Html5QrcodeScanner(
-        'reader',
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          rememberLastUsedCamera: true,
-          showTorchButtonIfSupported: true,
-        },
-        /* verbose= */ false,
-      )
-
-      try {
-        scanner.render(onScanSuccess, onScanFailure)
-        setScannerInitialized(true)
-      } catch (renderErr) {
-        console.error('Error starting scanner:', renderErr)
-        if (isMounted) {
-          setError(
-            'Failed to start camera. Please ensure you have granted camera permissions.',
+    // Get available cameras
+    Html5Qrcode.getCameras()
+      .then((devices) => {
+        if (devices && devices.length > 0) {
+          setCameras(
+            devices.map((d) => ({
+              id: d.id,
+              label: d.label || `Camera ${d.id}`,
+            })),
           )
-        }
-      }
-    }, 100)
 
-    // Cleanup function
+          // Prefer back camera
+          const backCamera = devices.find(
+            (d) =>
+              d.label.toLowerCase().includes('back') ||
+              d.label.toLowerCase().includes('rear') ||
+              d.label.toLowerCase().includes('environment'),
+          )
+          const defaultCamera = backCamera || devices[0]
+          setSelectedCamera(defaultCamera.id)
+
+          // Auto-start scanning
+          setTimeout(() => {
+            if (scannerRef.current) {
+              startScanner(defaultCamera.id)
+            }
+          }, 100)
+        }
+      })
+      .catch((err) => {
+        console.error('Error getting cameras:', err)
+        setError('Failed to detect cameras.')
+      })
+
     return () => {
-      isMounted = false
-      clearTimeout(initTimer)
-      if (scanner) {
-        scanner.clear().catch((error) => {
-          console.error('Failed to clear html5-qrcode scanner. ', error)
-        })
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {})
+        scannerRef.current = null
       }
     }
-  }, [permissionStatus, scannerInitialized])
+  }, [permissionStatus, startScanner])
+
+  const handleRescan = () => {
+    lastScannedRef.current = null
+    lastScanTimeRef.current = 0
+    setScanResult(null)
+  }
 
   return (
     <div className="space-y-6">
@@ -167,7 +266,7 @@ export default function ScanQRPage() {
             )}
 
             {/* Show permission request button when permission not granted */}
-            {permissionStatus === 'prompt' && !scannerInitialized && (
+            {permissionStatus === 'prompt' && (
               <div className="mb-4 flex flex-col items-center justify-center space-y-4 rounded-lg border border-dashed p-8">
                 <Camera className="text-muted-foreground h-12 w-12" />
                 <div className="space-y-2 text-center">
@@ -202,59 +301,67 @@ export default function ScanQRPage() {
               </div>
             )}
 
-            <div
-              id="reader"
-              className={`overflow-hidden rounded-md border bg-slate-100 dark:bg-slate-900 ${
-                permissionStatus === 'denied' ||
-                (!scannerInitialized && permissionStatus === 'prompt')
-                  ? 'hidden'
-                  : ''
-              }`}
-            ></div>
+            {permissionStatus === 'granted' && (
+              <div className="space-y-4">
+                {/* Camera controls */}
+                {cameras.length > 1 && (
+                  <div className="flex items-center gap-2">
+                    <SwitchCamera className="text-muted-foreground h-4 w-4" />
+                    <Select
+                      value={selectedCamera || undefined}
+                      onValueChange={switchCamera}
+                    >
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Select camera" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cameras.map((camera) => (
+                          <SelectItem key={camera.id} value={camera.id}>
+                            {camera.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
-            {/* Custom styles for the scanner to match shadcn/ui somewhat */}
+                {/* Scanner viewport */}
+                <div
+                  id="reader"
+                  className="overflow-hidden rounded-lg border bg-slate-100 dark:bg-slate-900"
+                ></div>
+
+                {/* Scanner status */}
+                {isScanning && (
+                  <p className="text-muted-foreground animate-pulse text-center text-sm">
+                    Scanning for QR codes...
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Custom styles for the scanner */}
             <style jsx global>{`
               #reader {
                 width: 100%;
                 min-height: 300px;
-                overflow: hidden;
                 position: relative;
               }
               #reader video {
                 width: 100% !important;
-                height: 100% !important;
+                height: auto !important;
+                min-height: 300px;
                 object-fit: cover;
-                border-radius: 0.375rem;
+                border-radius: 0.5rem;
               }
               #reader__scan_region {
                 background: transparent;
               }
-              /* Style the scanner dashboard to look better */
+              #reader__scan_region > img {
+                display: none;
+              }
               #reader__dashboard {
-                padding: 1rem;
-              }
-              #reader__dashboard_section_csr {
-                margin-bottom: 0.5rem;
-              }
-              #reader__dashboard_section_csr button {
-                padding: 0.5rem 1rem;
-                background: hsl(var(--primary));
-                color: hsl(var(--primary-foreground));
-                border: none;
-                border-radius: 0.375rem;
-                cursor: pointer;
-                font-size: 0.875rem;
-              }
-              #reader__dashboard_section_csr button:hover {
-                opacity: 0.9;
-              }
-              #reader__dashboard_section_csr select {
-                padding: 0.5rem;
-                border: 1px solid hsl(var(--border));
-                border-radius: 0.375rem;
-                background: hsl(var(--background));
-                color: hsl(var(--foreground));
-                margin-top: 0.5rem;
+                display: none !important;
               }
             `}</style>
           </CardContent>
@@ -271,13 +378,26 @@ export default function ScanQRPage() {
             {scanResult ? (
               <div className="animate-in fade-in zoom-in flex flex-col items-center justify-center space-y-4 rounded-lg border border-dashed p-8 text-center duration-300">
                 <CheckCircle2 className="h-12 w-12 text-green-500" />
-                <div className="space-y-1">
+                <div className="w-full space-y-2">
                   <p className="font-medium">Successfully Scanned</p>
-                  <p className="text-muted-foreground bg-muted rounded p-2 font-mono text-sm break-all">
+                  <p className="text-muted-foreground bg-muted rounded p-3 text-left font-mono text-sm break-all">
                     {scanResult}
                   </p>
                 </div>
-                {/* Add action buttons here later based on what the QR code contains */}
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleRescan}>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Scan Another
+                  </Button>
+                  {scanResult.startsWith('http') && (
+                    <Button
+                      size="sm"
+                      onClick={() => window.open(scanResult, '_blank')}
+                    >
+                      Open Link
+                    </Button>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="text-muted-foreground flex h-[300px] flex-col items-center justify-center space-y-2 rounded-lg border border-dashed p-8 text-center">
