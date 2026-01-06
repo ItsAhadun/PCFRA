@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   Card,
   CardContent,
@@ -8,36 +8,87 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Html5QrcodeScanner } from 'html5-qrcode'
 import { toast } from 'sonner'
-import { AlertCircle, CheckCircle2 } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Camera } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 export default function ScanQRPage() {
   const [scanResult, setScanResult] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [permissionStatus, setPermissionStatus] = useState<
+    'granted' | 'denied' | 'prompt'
+  >('prompt')
+  const [scannerInitialized, setScannerInitialized] = useState(false)
+
+  const requestCameraPermission = useCallback(async () => {
+    try {
+      setError(null)
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+      })
+      // Stop the stream immediately - we just needed to trigger the permission
+      stream.getTracks().forEach((track) => track.stop())
+      setPermissionStatus('granted')
+      // Re-trigger scanner initialization
+      setScannerInitialized(false)
+      setTimeout(() => setScannerInitialized(true), 100)
+    } catch (err: unknown) {
+      console.error('Camera permission error:', err)
+      if (err instanceof Error && err.name === 'NotAllowedError') {
+        setPermissionStatus('denied')
+        setError(
+          'Camera permission was denied. Please enable camera access in your browser settings and reload the page.',
+        )
+      } else {
+        setError(
+          'Failed to access camera. Please ensure your device has a camera and try again.',
+        )
+      }
+    }
+  }, [])
+
+  // Check initial permission status
+  useEffect(() => {
+    // Skip on server or if permissions API not available (we default to 'prompt')
+    if (typeof window === 'undefined' || !navigator.permissions) {
+      return
+    }
+
+    navigator.permissions
+      .query({ name: 'camera' as PermissionName })
+      .then((result) => {
+        setPermissionStatus(result.state as 'granted' | 'denied' | 'prompt')
+
+        result.onchange = () => {
+          setPermissionStatus(result.state as 'granted' | 'denied' | 'prompt')
+        }
+      })
+      .catch(() => {
+        // Permissions API not supported for camera, keep default 'prompt'
+      })
+  }, [])
 
   useEffect(() => {
     // Only run on client side
     if (typeof window === 'undefined') return
 
-    function onScanSuccess(decodedText: string, decodedResult: any) {
-      // Handle the scanned code as you retrieve it
-      console.log(`Code matched = ${decodedText}`, decodedResult)
-      setScanResult(decodedText)
+    // Don't initialize if permission is denied
+    if (permissionStatus === 'denied') return
 
-      // Stop scanning after success if desired, or keep scanning
-      // scanner.clear()
+    function onScanSuccess(decodedText: string) {
+      // Handle the scanned code as you retrieve it
+      console.log(`Code matched = ${decodedText}`)
+      setScanResult(decodedText)
 
       toast.success('QR Code Scanned!', {
         description: `Content: ${decodedText}`,
       })
     }
 
-    function onScanFailure(error: any) {
+    function onScanFailure() {
       // handle scan failure, usually better to ignore and keep scanning.
-      // for example:
-      // console.warn(`Code scan error = ${error}`);
     }
 
     // Use a reference to track if the effect is active
@@ -59,13 +110,15 @@ export default function ScanQRPage() {
         {
           fps: 10,
           qrbox: { width: 250, height: 250 },
-          // aspectRatio: 1.0,
+          rememberLastUsedCamera: true,
+          showTorchButtonIfSupported: true,
         },
         /* verbose= */ false,
       )
 
       try {
         scanner.render(onScanSuccess, onScanFailure)
+        setScannerInitialized(true)
       } catch (renderErr) {
         console.error('Error starting scanner:', renderErr)
         if (isMounted) {
@@ -86,7 +139,7 @@ export default function ScanQRPage() {
         })
       }
     }
-  }, [])
+  }, [permissionStatus, scannerInitialized])
 
   return (
     <div className="space-y-6">
@@ -112,16 +165,58 @@ export default function ScanQRPage() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
+
+            {/* Show permission request button when permission not granted */}
+            {permissionStatus === 'prompt' && !scannerInitialized && (
+              <div className="mb-4 flex flex-col items-center justify-center space-y-4 rounded-lg border border-dashed p-8">
+                <Camera className="text-muted-foreground h-12 w-12" />
+                <div className="space-y-2 text-center">
+                  <p className="font-medium">Camera Access Required</p>
+                  <p className="text-muted-foreground text-sm">
+                    Tap the button below to enable camera access for QR scanning
+                  </p>
+                </div>
+                <Button onClick={requestCameraPermission} size="lg">
+                  <Camera className="mr-2 h-4 w-4" />
+                  Enable Camera
+                </Button>
+              </div>
+            )}
+
+            {permissionStatus === 'denied' && (
+              <div className="border-destructive flex flex-col items-center justify-center space-y-4 rounded-lg border border-dashed p-8">
+                <AlertCircle className="text-destructive h-12 w-12" />
+                <div className="space-y-2 text-center">
+                  <p className="font-medium">Camera Access Denied</p>
+                  <p className="text-muted-foreground text-sm">
+                    Please enable camera permissions in your browser settings
+                    and reload this page.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => window.location.reload()}
+                >
+                  Reload Page
+                </Button>
+              </div>
+            )}
+
             <div
               id="reader"
-              className="overflow-hidden rounded-md border bg-slate-100 dark:bg-slate-900"
+              className={`overflow-hidden rounded-md border bg-slate-100 dark:bg-slate-900 ${
+                permissionStatus === 'denied' ||
+                (!scannerInitialized && permissionStatus === 'prompt')
+                  ? 'hidden'
+                  : ''
+              }`}
             ></div>
 
             {/* Custom styles for the scanner to match shadcn/ui somewhat */}
             <style jsx global>{`
               #reader {
                 width: 100%;
-                height: 100%;
+                min-height: 300px;
                 overflow: hidden;
                 position: relative;
               }
@@ -134,12 +229,32 @@ export default function ScanQRPage() {
               #reader__scan_region {
                 background: transparent;
               }
-              #reader__dashboard_section_csr span,
-              #reader__dashboard_section_swaplink {
-                display: none !important;
+              /* Style the scanner dashboard to look better */
+              #reader__dashboard {
+                padding: 1rem;
+              }
+              #reader__dashboard_section_csr {
+                margin-bottom: 0.5rem;
               }
               #reader__dashboard_section_csr button {
-                display: none !important;
+                padding: 0.5rem 1rem;
+                background: hsl(var(--primary));
+                color: hsl(var(--primary-foreground));
+                border: none;
+                border-radius: 0.375rem;
+                cursor: pointer;
+                font-size: 0.875rem;
+              }
+              #reader__dashboard_section_csr button:hover {
+                opacity: 0.9;
+              }
+              #reader__dashboard_section_csr select {
+                padding: 0.5rem;
+                border: 1px solid hsl(var(--border));
+                border-radius: 0.375rem;
+                background: hsl(var(--background));
+                color: hsl(var(--foreground));
+                margin-top: 0.5rem;
               }
             `}</style>
           </CardContent>
