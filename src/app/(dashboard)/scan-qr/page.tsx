@@ -21,15 +21,6 @@ export default function ScanQRPage() {
     // Only run on client side
     if (typeof window === 'undefined') return
 
-    const scanner = new Html5QrcodeScanner(
-      'reader',
-      {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-      },
-      /* verbose= */ false,
-    )
-
     function onScanSuccess(decodedText: string, decodedResult: any) {
       // Handle the scanned code as you retrieve it
       console.log(`Code matched = ${decodedText}`, decodedResult)
@@ -49,23 +40,51 @@ export default function ScanQRPage() {
       // console.warn(`Code scan error = ${error}`);
     }
 
-    // Use setTimeout to avoid synchronous state updates during render
-    setTimeout(() => {
+    // Use a reference to track if the effect is active
+    let isMounted = true
+    let scanner: Html5QrcodeScanner | null = null
+
+    // Give a small delay to ensure DOM is ready and previous instances are cleared
+    const initTimer = setTimeout(() => {
+      if (!isMounted) return
+
+      // Clean up any existing scanner content manually if needed
+      const readerElement = document.getElementById('reader')
+      if (readerElement) {
+        readerElement.innerHTML = ''
+      }
+
+      scanner = new Html5QrcodeScanner(
+        'reader',
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          // aspectRatio: 1.0,
+        },
+        /* verbose= */ false,
+      )
+
       try {
         scanner.render(onScanSuccess, onScanFailure)
       } catch (renderErr) {
         console.error('Error starting scanner:', renderErr)
-        setError(
-          'Failed to start camera. Please ensure you have granted camera permissions.',
-        )
+        if (isMounted) {
+          setError(
+            'Failed to start camera. Please ensure you have granted camera permissions.',
+          )
+        }
       }
-    }, 0)
+    }, 100)
 
     // Cleanup function
     return () => {
-      scanner.clear().catch((error) => {
-        console.error('Failed to clear html5-qrcode scanner. ', error)
-      })
+      isMounted = false
+      clearTimeout(initTimer)
+      if (scanner) {
+        scanner.clear().catch((error) => {
+          console.error('Failed to clear html5-qrcode scanner. ', error)
+        })
+      }
     }
   }, [])
 
@@ -100,15 +119,27 @@ export default function ScanQRPage() {
 
             {/* Custom styles for the scanner to match shadcn/ui somewhat */}
             <style jsx global>{`
+              #reader {
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                position: relative;
+              }
               #reader video {
+                width: 100% !important;
+                height: 100% !important;
                 object-fit: cover;
                 border-radius: 0.375rem;
               }
               #reader__scan_region {
                 background: transparent;
               }
-              #reader__dashboard_section_csr span {
-                display: none;
+              #reader__dashboard_section_csr span,
+              #reader__dashboard_section_swaplink {
+                display: none !important;
+              }
+              #reader__dashboard_section_csr button {
+                display: none !important;
               }
             `}</style>
           </CardContent>
