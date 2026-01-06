@@ -41,104 +41,15 @@ export default function ScanQRPage() {
   const [isScanning, setIsScanning] = useState(false)
   const [cameras, setCameras] = useState<CameraDevice[]>([])
   const [selectedCamera, setSelectedCamera] = useState<string | null>(null)
+  const [isReady, setIsReady] = useState(false)
 
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const lastScannedRef = useRef<string | null>(null)
   const lastScanTimeRef = useRef<number>(0)
+  const isMountedRef = useRef(true)
 
   // Minimum time between accepting same QR code again (5 seconds)
   const DEBOUNCE_TIME = 5000
-
-  const stopScanner = useCallback(async () => {
-    if (scannerRef.current && isScanning) {
-      try {
-        await scannerRef.current.stop()
-        setIsScanning(false)
-      } catch (err) {
-        console.error('Error stopping scanner:', err)
-      }
-    }
-  }, [isScanning])
-
-  const startScanner = useCallback(
-    async (cameraId?: string) => {
-      if (!scannerRef.current) return
-
-      try {
-        setError(null)
-
-        const cameraIdToUse = cameraId || selectedCamera
-
-        const config = {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-        }
-
-        const onScanSuccess = (decodedText: string) => {
-          const now = Date.now()
-
-          // Check if this is a duplicate scan
-          if (
-            lastScannedRef.current === decodedText &&
-            now - lastScanTimeRef.current < DEBOUNCE_TIME
-          ) {
-            // Same QR code scanned within debounce time, ignore
-            return
-          }
-
-          // New scan or enough time has passed
-          lastScannedRef.current = decodedText
-          lastScanTimeRef.current = now
-          setScanResult(decodedText)
-
-          toast.success('QR Code Scanned!', {
-            description:
-              decodedText.length > 50
-                ? `${decodedText.substring(0, 50)}...`
-                : decodedText,
-            id: 'qr-scan-success', // Use same ID to prevent duplicate toasts
-          })
-        }
-
-        if (cameraIdToUse) {
-          await scannerRef.current.start(
-            cameraIdToUse,
-            config,
-            onScanSuccess,
-            () => {}, // Ignore scan failures
-          )
-        } else {
-          // Use back camera by default on mobile
-          await scannerRef.current.start(
-            { facingMode: 'environment' },
-            config,
-            onScanSuccess,
-            () => {},
-          )
-        }
-
-        setIsScanning(true)
-      } catch (err) {
-        console.error('Error starting scanner:', err)
-        setError(
-          'Failed to start camera. Please check permissions and try again.',
-        )
-      }
-    },
-    [selectedCamera],
-  )
-
-  const switchCamera = useCallback(
-    async (newCameraId: string) => {
-      setSelectedCamera(newCameraId)
-      if (isScanning) {
-        await stopScanner()
-        // Small delay before starting with new camera
-        setTimeout(() => startScanner(newCameraId), 100)
-      }
-    },
-    [isScanning, stopScanner, startScanner],
-  )
 
   const requestCameraPermission = useCallback(async () => {
     try {
@@ -184,17 +95,46 @@ export default function ScanQRPage() {
       })
   }, [])
 
-  // Initialize scanner and get cameras when permission is granted
+  // Mark component as ready after mount
+  useEffect(() => {
+    isMountedRef.current = true
+    // Wait for DOM to be ready
+    const timer = setTimeout(() => {
+      setIsReady(true)
+    }, 100)
+
+    return () => {
+      isMountedRef.current = false
+      clearTimeout(timer)
+    }
+  }, [])
+
+  // Initialize scanner when permission is granted and DOM is ready
   useEffect(() => {
     if (typeof window === 'undefined') return
     if (permissionStatus !== 'granted') return
+    if (!isReady) return
 
-    // Initialize the scanner
-    scannerRef.current = new Html5Qrcode('reader')
+    // Check if reader element exists
+    const readerElement = document.getElementById('reader')
+    if (!readerElement) {
+      console.log('Reader element not found, retrying...')
+      return
+    }
 
-    // Get available cameras
-    Html5Qrcode.getCameras()
-      .then((devices) => {
+    let localScanner: Html5Qrcode | null = null
+
+    const initScanner = async () => {
+      try {
+        // Create scanner instance
+        localScanner = new Html5Qrcode('reader')
+        scannerRef.current = localScanner
+
+        // Get available cameras
+        const devices = await Html5Qrcode.getCameras()
+
+        if (!isMountedRef.current) return
+
         if (devices && devices.length > 0) {
           setCameras(
             devices.map((d) => ({
@@ -213,26 +153,125 @@ export default function ScanQRPage() {
           const defaultCamera = backCamera || devices[0]
           setSelectedCamera(defaultCamera.id)
 
-          // Auto-start scanning
-          setTimeout(() => {
-            if (scannerRef.current) {
-              startScanner(defaultCamera.id)
-            }
-          }, 100)
-        }
-      })
-      .catch((err) => {
-        console.error('Error getting cameras:', err)
-        setError('Failed to detect cameras.')
-      })
+          // Start scanning
+          const config = {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+          }
 
-    return () => {
-      if (scannerRef.current) {
-        scannerRef.current.stop().catch(() => {})
-        scannerRef.current = null
+          const onScanSuccess = (decodedText: string) => {
+            const now = Date.now()
+
+            // Check if this is a duplicate scan
+            if (
+              lastScannedRef.current === decodedText &&
+              now - lastScanTimeRef.current < DEBOUNCE_TIME
+            ) {
+              return
+            }
+
+            lastScannedRef.current = decodedText
+            lastScanTimeRef.current = now
+            setScanResult(decodedText)
+
+            toast.success('QR Code Scanned!', {
+              description:
+                decodedText.length > 50
+                  ? `${decodedText.substring(0, 50)}...`
+                  : decodedText,
+              id: 'qr-scan-success',
+            })
+          }
+
+          await localScanner.start(
+            defaultCamera.id,
+            config,
+            onScanSuccess,
+            () => {},
+          )
+
+          if (isMountedRef.current) {
+            setIsScanning(true)
+          }
+        }
+      } catch (err) {
+        console.error('Error initializing scanner:', err)
+        if (isMountedRef.current) {
+          setError('Failed to start camera. Please try reloading the page.')
+        }
       }
     }
-  }, [permissionStatus, startScanner])
+
+    initScanner()
+
+    return () => {
+      if (localScanner) {
+        localScanner
+          .stop()
+          .then(() => {
+            localScanner = null
+            scannerRef.current = null
+          })
+          .catch(() => {
+            // Ignore stop errors on cleanup
+          })
+      }
+    }
+  }, [permissionStatus, isReady])
+
+  const switchCamera = async (newCameraId: string) => {
+    if (!scannerRef.current) return
+
+    setSelectedCamera(newCameraId)
+
+    try {
+      // Stop current scanning
+      if (isScanning) {
+        await scannerRef.current.stop()
+        setIsScanning(false)
+      }
+
+      // Start with new camera
+      const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+      }
+
+      const onScanSuccess = (decodedText: string) => {
+        const now = Date.now()
+
+        if (
+          lastScannedRef.current === decodedText &&
+          now - lastScanTimeRef.current < DEBOUNCE_TIME
+        ) {
+          return
+        }
+
+        lastScannedRef.current = decodedText
+        lastScanTimeRef.current = now
+        setScanResult(decodedText)
+
+        toast.success('QR Code Scanned!', {
+          description:
+            decodedText.length > 50
+              ? `${decodedText.substring(0, 50)}...`
+              : decodedText,
+          id: 'qr-scan-success',
+        })
+      }
+
+      await scannerRef.current.start(
+        newCameraId,
+        config,
+        onScanSuccess,
+        () => {},
+      )
+      setIsScanning(true)
+    } catch (err) {
+      console.error('Error switching camera:', err)
+      setError('Failed to switch camera.')
+    }
+  }
 
   const handleRescan = () => {
     lastScannedRef.current = null
@@ -328,7 +367,7 @@ export default function ScanQRPage() {
                 {/* Scanner viewport */}
                 <div
                   id="reader"
-                  className="overflow-hidden rounded-lg border bg-slate-100 dark:bg-slate-900"
+                  className="min-h-[300px] overflow-hidden rounded-lg border bg-slate-100 dark:bg-slate-900"
                 ></div>
 
                 {/* Scanner status */}
